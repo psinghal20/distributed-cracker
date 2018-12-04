@@ -8,6 +8,14 @@ import (
     "strings"
 )
 
+type Job struct {
+    reqConn net.Conn
+    hash string
+    len string
+}
+
+var jobs []Job
+
 func main() {
     arguments := os.Args
     if len(arguments) == 1 {
@@ -28,25 +36,28 @@ func main() {
             fmt.Println(err)
             return
         }
-        go handleConnection(c)
+        go handleNewJobRequest(c)
     }
 }
 
-func handleConnection(conn net.Conn) {
-    fmt.Printf("accepting request from %s\n", conn.RemoteAddr().String())
-    for {
-        data, err := bufio.NewReader(conn).ReadString('\n')
-        if err != nil {
-            fmt.Println(err)
-            return
-        }
-        data = strings.TrimSpace(string(data))
-        if data == "quit" {
-            fmt.Printf("Closing Connection from %s\n", conn.RemoteAddr().String())
-            break
-        }
-        fmt.Println(data)
-        conn.Write([]byte("Hey you just connected to me!"))
+func handleNewJobRequest(conn net.Conn) {
+    fmt.Printf("New crack request from %s\n", conn.RemoteAddr().String())
+
+    data, err := bufio.NewReader(conn).ReadString('\n')
+    if err != nil {
+        fmt.Println("Couldn't set up the new job: ", err)
+        return
     }
-    conn.Close()
+    jobParams := strings.Split(strings.TrimSuffix(data, "\n"), ":")
+    setUpNewJob(conn, jobParams)
+    conn.Write([]byte("Working on you cracking request kindly wait!"))
+}
+
+func setUpNewJob(conn net.Conn, jobParams []string) {
+    job := Job{
+        conn,
+        jobParams[0],
+        jobParams[1],
+    }
+    jobs = append(jobs, job)
 }
