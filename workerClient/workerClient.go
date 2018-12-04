@@ -3,13 +3,13 @@ package main
 import (
     "fmt"
     "net"
-    "bufio"
     "os"
+    "bufio"
 )
 
 func main() {
     arguments := os.Args
-    if len(arguments) != 5 {
+    if len(arguments) != 3 {
         fmt.Println("Please provide correct arguments!")
         os.Exit(1)
     }
@@ -21,24 +21,12 @@ func main() {
         fmt.Println(err)
         os.Exit(1)
     }
-    HASH := arguments[3]
-    LENGTH := arguments[4]
-    _, err = conn.Write([]byte(HASH + ":" + LENGTH + "\n"))
-    if err != nil {
-        fmt.Println(err)
-        os.Exit(1)
-    }
+    fmt.Println("Node joined the network as a worker!")
     data, err := bufio.NewReader(conn).ReadString('\n')
     if err != nil {
         fmt.Println(err)
         os.Exit(1)
     }
-    fmt.Print(data)
-    data, err = bufio.NewReader(conn).ReadString('\n')
-    if err != nil {
-        fmt.Println(err)
-        os.Exit(1)
-    }
-    fmt.Printf("The cracked password is : %s", data)
+    fmt.Printf("Task received: %s\n", data)
     conn.Close()
 }
