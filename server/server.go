@@ -7,16 +7,17 @@ import (
     "bufio"
     "strings"
     "sync"
+    "strconv"
 )
 
 type Job struct {
     jobId int
     reqConn net.Conn
     hash string
-    len string
+    len int
 }
 
-var jobs []Job
+var jobs map[net.Conn]Job = make(map[net.Conn]Job)
 var wg sync.WaitGroup
 
 func main() {
@@ -29,7 +30,7 @@ func main() {
     WORKER_PORT := ":" + arguments[2]
     wg.Add(2)
     go requestServer(REQUEST_PORT)
-    go workerServer(WORKER_PORT)
+    go udpServer(WORKER_PORT)
     wg.Wait()
 }
 
@@ -65,12 +66,12 @@ func handleNewJobRequest(conn net.Conn) {
 }
 
 func setUpNewJob(conn net.Conn, jobParams []string) {
+    passLen, _ := strconv.Atoi(jobParams[1])
     job := Job{
         len(jobs),
         conn,
         jobParams[0],
-        jobParams[1],
+        passLen,
     }
-    jobs = append(jobs, job)
-    fmt.Printf("%+v\n",jobs)
+    jobs[conn] = job
 }
