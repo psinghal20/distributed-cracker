@@ -10,6 +10,14 @@ import (
     "strconv"
 )
 
+type Task struct {
+    jobId int
+    workerAssigned Worker
+    status int
+    start string
+    end string
+}
+
 type Job struct {
     jobId int
     reqConn net.Conn
@@ -17,7 +25,8 @@ type Job struct {
     len int
 }
 
-var jobs map[net.Conn]Job = make(map[net.Conn]Job)
+var jobs []Job
+var tasks []Task
 var wg sync.WaitGroup
 
 func main() {
@@ -73,5 +82,46 @@ func setUpNewJob(conn net.Conn, jobParams []string) {
         jobParams[0],
         passLen,
     }
-    jobs[conn] = job
+    jobs = append(jobs, job)
+    splitJob(job)
+}
+
+var dic ="abcdefghijklmnopqrstuvwxyz"
+var start string
+var counter = 0
+var flag = false
+
+func splitJob(job Job) {
+    start = strings.Repeat("a", job.len)
+    fmt.Printf("jobs: %v", job.len)
+    permuteStrings("", job.len, job)
+    fmt.Printf("\nTASK : %v\n", tasks)
+}
+
+func permuteStrings(prefix string, k int, job Job) {
+    if k == 0 {
+        counter++
+        if counter == 5000 || prefix == strings.Repeat("z", job.len) {
+            newTask := Task{
+                job.jobId,
+                Worker{},
+                0,
+                start,
+                prefix,
+            }
+            fmt.Printf("\nTASK: %v\n", newTask)
+            tasks = append(tasks, newTask)
+            flag = true
+            counter = 0
+        }
+        if flag {
+            start = prefix
+            flag = false
+        }
+        return
+    }
+    for i := 0; i < 26; i++ {
+        newPrefix := prefix + string(dic[i])
+        permuteStrings(newPrefix, k - 1, job)
+    }
 }
