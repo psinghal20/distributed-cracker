@@ -11,22 +11,22 @@ import (
 )
 
 type Task struct {
-    jobId int
-    workerId int
+    jobId string
+    workerId string
     status int
     start string
     end string
 }
 
 type Job struct {
-    jobId int
+    jobId string
     reqConn net.Conn
     hash string
     len int
 }
 
-var jobs []Job
-var tasks []Task
+var jobs map[string]Job = make(map[string]Job)
+var tasks map[string]Task = make(map[string]Task)
 var wg sync.WaitGroup
 
 func main() {
@@ -77,12 +77,12 @@ func handleNewJobRequest(conn net.Conn) {
 func setUpNewJob(conn net.Conn, jobParams []string) {
     passLen, _ := strconv.Atoi(jobParams[1])
     job := Job{
-        len(jobs),
+        conn.RemoteAddr().String(),
         conn,
         jobParams[0],
         passLen,
     }
-    jobs = append(jobs, job)
+    jobs[conn.RemoteAddr().String()] = job
     splitJob(job)
     distributeTask()
 }
@@ -101,14 +101,13 @@ func permuteStrings(prefix string, k int, job Job) {
     if k == 0 {
         counter++
         if counter == 5000 || prefix == strings.Repeat("z", job.len) {
-            newTask := Task{
+            tasks[job.jobId+":"+start] = Task{
                 job.jobId,
                 NoWorker,
                 UnassignedTask,
                 start,
                 prefix,
             }
-            tasks = append(tasks, newTask)
             flag = true
             counter = 0
         }
@@ -125,39 +124,35 @@ func permuteStrings(prefix string, k int, job Job) {
 }
 
 func distributeTask() {
-    for inTask, _ := range tasks {
-        for inWorker, _ := range workers {
-            if tasks[inTask].status == UnassignedTask && workers[inWorker].status == FreeWorker {
-                tasks[inTask].workerId = inWorker
-                tasks[inTask].status = AssignedTask //1 = assigned, 2 = completed
-                workers[inWorker].status = BusyWorker //1 = busy
-                workers[inWorker].taskId = inTask
-                sendWorkerTask(tasks[inTask], workers[inWorker])
+    for taskId, task := range tasks {
+        for workerId, worker := range workers {
+            if task.status == UnassignedTask && worker.status == FreeWorker {
+                task.workerId = workerId
+                task.status = AssignedTask //1 = assigned
+                tasks[taskId] = task
+                worker.status = BusyWorker //1 = busy
+                worker.taskId = taskId
+                workers[workerId] = worker
+                sendWorkerTask(tasks[taskId], workers[workerId])
             }
         }
     }
 }
 
-func removeJob(jobId int) {
-    tempTasks := tasks[:0]
-    for _, task := range tasks {
-        if task.jobId != jobId {
-            tempTasks = append(tempTasks, task)
+func removeJob(jobId string) {
+    delete(jobs, jobId)
+    for taskId, task := range tasks {
+        if jobId == task.jobId {
+            delete(tasks, taskId)
         }
     }
-    tasks = tempTasks
-    jobs = append(jobs[:jobId], jobs[jobId + 1:]...)
 }
 
-func sendResultToClient(result string, udpAddr *net.UDPAddr) {
-    for inWorker, _ := range workers {
-        if workers[inWorker].workerAddr.String() == udpAddr.String() {
-            job := jobs[tasks[workers[inWorker].taskId].jobId]
-            _, err := job.reqConn.Write([]byte(fmt.Sprintf("Password Found : %s", result)))
-            if err != nil {
-                fmt.Println(err)
-            }
-            removeJob(job.jobId)
-        }
+func sendResultToClient(result string, jobId string) {
+    job := jobs[jobId]
+    _, err := job.reqConn.Write([]byte(fmt.Sprintf("%s", result)))
+    if err != nil {
+        fmt.Println(err)
     }
+    removeJob(jobId)
 }

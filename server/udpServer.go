@@ -11,7 +11,7 @@ import (
 type Worker struct {
     workerAddr *net.UDPAddr
     status int
-    taskId int
+    taskId string
 }
 
 type Packet struct {
@@ -20,7 +20,7 @@ type Packet struct {
     End string
 }
 
-var workers []Worker
+var workers map[string]Worker = make(map[string]Worker)
 var udpConn *net.UDPConn
 
 func (w Worker) isBusy() int {
@@ -71,22 +71,38 @@ func handleWorkerJoinRequest(udpAddr *net.UDPAddr) {
 
 func handleWorkerNotFoundRequest(udpAddr *net.UDPAddr) {
     fmt.Println("Worker Couldn't find the password")
-    freeWorker(udpAddr)
+    workerId := udpAddr.String()
+    taskId := workers[workerId].taskId
+    task, ok := tasks[taskId]
+    if !ok {
+        return
+    }
+    jobId := task.jobId
+    if checkStatusOfJob(jobId) {
+        sendResultToClient("Password Not Found!", jobId)
+    }
+    freeWorker(workerId)
 }
 
 func handleWorkerFoundRequest(data string, udpAddr *net.UDPAddr) {
     fmt.Printf("Worker node %v found the password : %s\n", udpAddr, data)
-    sendResultToClient(strings.Split(data, ":")[1], udpAddr)
-    freeWorker(udpAddr)
+    workerId := udpAddr.String()
+    taskId := workers[workerId].taskId
+    task, ok := tasks[taskId]
+    if !ok {
+        return
+    }
+    jobId := task.jobId
+    sendResultToClient(strings.Split(data, ":")[1], jobId)
+    freeWorker(workerId)
 }
 
 func setUpNewWorker(udpAddr *net.UDPAddr) {
-    newWorker := Worker{
+    workers[udpAddr.String()] = Worker{
         udpAddr,
         FreeWorker,
         NoTask,
     }
-    workers = append(workers, newWorker)
 }
 
 func sendWorkerTask(task Task, worker Worker) {
@@ -102,12 +118,23 @@ func sendWorkerTask(task Task, worker Worker) {
     udpConn.WriteToUDP(data, worker.workerAddr)
 }
 
-func freeWorker(udpAddr *net.UDPAddr) {
-    for inWorker, _ := range workers {
-        if workers[inWorker].workerAddr.String() == udpAddr.String() {
-            workers[inWorker].status = FreeWorker
-            workers[inWorker].taskId = NoTask
+func freeWorker(workerId string) {
+    worker := workers[workerId]
+    worker.status = FreeWorker
+    worker.taskId = NoTask
+    workers[workerId] = worker
+    distributeTask()
+}
+
+func removeTask(taskId string) {
+    delete(tasks, taskId)
+}
+
+func checkStatusOfJob(jobId string) bool {
+    for _, task := range tasks {
+        if jobId == task.jobId && task.status != CompletedTask {
+            return false
         }
     }
-    distributeTask()
+    return true
 }
