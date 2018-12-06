@@ -34,12 +34,12 @@ func udpServer(port string) {
     defer udpConn.Close()
     data := make([]byte, 1024)
     for {
-        _, udpAddr, err := udpConn.ReadFromUDP(data)
+        size, udpAddr, err := udpConn.ReadFromUDP(data)
         if err != nil {
             fmt.Println(err)
             return
         }
-        go handleWorkerJoinRequest(udpAddr)
+        go handleUDPPacket(data[0:size], udpAddr)
     }
 }
 
