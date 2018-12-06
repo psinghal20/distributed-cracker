@@ -3,11 +3,20 @@ package main
 import (
     "fmt"
     "net"
-    "os"
     "bufio"
+    "encoding/json"
+    "os"
 )
 
 var conn net.Conn
+
+type Packet struct {
+    Hash string
+    Start string
+    End string
+}
+
+var receivedPacket Packet
 
 func main() {
     arguments := os.Args
@@ -24,12 +33,14 @@ func main() {
         os.Exit(1)
     }
     joinRequest()
+    readPacket()
+    executeQuery()
     data, err := bufio.NewReader(conn).ReadString('\n')
     if err != nil {
         fmt.Println(err)
         os.Exit(1)
     }
-    fmt.Printf("Task received: %s\n", data)
+    fmt.Printf("Task : %s\n", data)
     conn.Close()
 }
 
@@ -42,5 +53,25 @@ func joinRequest() {
     } else {
         fmt.Println("Node failed to join the network as worker!")
         os.Exit(1)
+    }
+}
+
+func notFoundResponse() {
+    conn.Write([]byte("NOT FOUND"))
+}
+
+func foundResponse() {
+    conn.Write([]byte(fmt.Sprintf("FOUND:%s", result)))
+}
+
+func readPacket() {
+    buf := make([]byte, 1024)
+    size, err := conn.Read(buf);
+    if err != nil {
+        fmt.Println("Couldn't read the packet!", err)
+    }
+    err = json.Unmarshal(buf[:size], &receivedPacket);
+    if err != nil {
+        fmt.Println(err)
     }
 }

@@ -130,8 +130,9 @@ func distributeTask() {
             if tasks[inTask].status == 0 && workers[inWorker].status == 0 {
                 tasks[inTask].workerId = inWorker
                 tasks[inTask].status = 1 //1 = assigned, 2 = completed
-                workers[inWorker].status = 1 //1 = free
+                workers[inWorker].status = 1 //1 = busy
                 workers[inWorker].taskId = inTask
+                sendWorkerTask(tasks[inTask], workers[inWorker])
             }
         }
     }
@@ -142,16 +143,21 @@ func removeJob(jobId int) {
     for _, task := range tasks {
         if task.jobId != jobId {
             tempTasks = append(tempTasks, task)
-        } else {
-            if task.workerId != -1 {
-                workers[task.workerId] = Worker{
-                    workers[task.workerId].workerAddr,
-                    0,
-                    -1,
-                }
-            }
         }
     }
     tasks = tempTasks
     jobs = append(jobs[:jobId], jobs[jobId + 1:]...)
+}
+
+func sendResultToClient(result string, udpAddr *net.UDPAddr) {
+    for inWorker, _ := range workers {
+        if workers[inWorker].workerAddr.String() == udpAddr.String() {
+            job := jobs[tasks[workers[inWorker].taskId].jobId]
+            _, err := job.reqConn.Write([]byte(fmt.Sprintf("Password Found : %s", result)))
+            if err != nil {
+                fmt.Println(err)
+            }
+            removeJob(job.jobId)
+        }
+    }
 }

@@ -34,11 +34,12 @@ func main() {
         os.Exit(1)
     }
     fmt.Print(data)
-    data, err = bufio.NewReader(conn).ReadString('\n')
+    result := make([]byte, 1024)
+    size, err := conn.Read(result)
     if err != nil {
         fmt.Println(err)
         os.Exit(1)
     }
-    fmt.Printf("The cracked password is : %s", data)
+    fmt.Printf("The cracked password is : %s", string(result[:size]))
     conn.Close()
 }

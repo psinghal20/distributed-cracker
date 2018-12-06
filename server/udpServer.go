@@ -4,12 +4,20 @@ import (
     "fmt"
     "net"
     "os"
+    "encoding/json"
+    "strings"
 )
 
 type Worker struct {
     workerAddr *net.UDPAddr
     status int
     taskId int
+}
+
+type Packet struct {
+    Hash string
+    Start string
+    End string
 }
 
 var workers []Worker
@@ -63,10 +71,13 @@ func handleWorkerJoinRequest(udpAddr *net.UDPAddr) {
 
 func handleWorkerNotFoundRequest(udpAddr *net.UDPAddr) {
     fmt.Println("Worker Couldn't find the password")
+    freeWorker(udpAddr)
 }
 
 func handleWorkerFoundRequest(data string, udpAddr *net.UDPAddr) {
     fmt.Printf("Worker node %v found the password : %s\n", udpAddr, data)
+    sendResultToClient(strings.Split(data, ":")[1], udpAddr)
+    freeWorker(udpAddr)
 }
 
 func setUpNewWorker(udpAddr *net.UDPAddr) {
@@ -76,4 +87,26 @@ func setUpNewWorker(udpAddr *net.UDPAddr) {
         -1,
     }
     workers = append(workers, newWorker)
+}
+
+func sendWorkerTask(task Task, worker Worker) {
+    packet := Packet{
+        jobs[task.jobId].hash,
+        task.start,
+        task.end,
+    }
+    data, err := json.Marshal(packet)
+    if err != nil {
+        fmt.Println("Couldn't marshal packet", err)
+    }
+    udpConn.WriteToUDP(data, worker.workerAddr)
+}
+
+func freeWorker(udpAddr *net.UDPAddr) {
+    for inWorker, _ := range workers {
+        if workers[inWorker].workerAddr.String() == udpAddr.String() {
+            workers[inWorker].status = 0
+            workers[inWorker].taskId = -1
+        }
+    }
 }
