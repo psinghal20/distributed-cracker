@@ -7,13 +7,12 @@ import (
 )
 
 type Worker struct {
-    workerId int
     workerAddr *net.UDPAddr
     status int
+    taskId int
 }
 
-var workers map[*net.UDPAddr]Worker = make(map[*net.UDPAddr]Worker)
-
+var workers []Worker
 var udpConn *net.UDPConn
 
 func (w Worker) isBusy() int {
@@ -72,10 +71,9 @@ func handleWorkerFoundRequest(data string, udpAddr *net.UDPAddr) {
 
 func setUpNewWorker(udpAddr *net.UDPAddr) {
     newWorker := Worker{
-        len(workers),
         udpAddr,
         0,
+        -1,
     }
-    workers[udpAddr] = newWorker
-    fmt.Printf("%v\n", workers)
+    workers = append(workers, newWorker)
 }

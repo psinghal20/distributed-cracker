@@ -12,7 +12,7 @@ import (
 
 type Task struct {
     jobId int
-    workerAssigned Worker
+    workerId int
     status int
     start string
     end string
@@ -84,6 +84,7 @@ func setUpNewJob(conn net.Conn, jobParams []string) {
     }
     jobs = append(jobs, job)
     splitJob(job)
+    distributeTask()
 }
 
 var dic ="abcdefghijklmnopqrstuvwxyz"
@@ -93,9 +94,7 @@ var flag = false
 
 func splitJob(job Job) {
     start = strings.Repeat("a", job.len)
-    fmt.Printf("jobs: %v", job.len)
     permuteStrings("", job.len, job)
-    fmt.Printf("\nTASK : %v\n", tasks)
 }
 
 func permuteStrings(prefix string, k int, job Job) {
@@ -104,12 +103,11 @@ func permuteStrings(prefix string, k int, job Job) {
         if counter == 5000 || prefix == strings.Repeat("z", job.len) {
             newTask := Task{
                 job.jobId,
-                Worker{},
+                -1,
                 0,
                 start,
                 prefix,
             }
-            fmt.Printf("\nTASK: %v\n", newTask)
             tasks = append(tasks, newTask)
             flag = true
             counter = 0
@@ -124,4 +122,36 @@ func permuteStrings(prefix string, k int, job Job) {
         newPrefix := prefix + string(dic[i])
         permuteStrings(newPrefix, k - 1, job)
     }
+}
+
+func distributeTask() {
+    for inTask, _ := range tasks {
+        for inWorker, _ := range workers {
+            if tasks[inTask].status == 0 && workers[inWorker].status == 0 {
+                tasks[inTask].workerId = inWorker
+                tasks[inTask].status = 1 //1 = assigned, 2 = completed
+                workers[inWorker].status = 1 //1 = free
+                workers[inWorker].taskId = inTask
+            }
+        }
+    }
+}
+
+func removeJob(jobId int) {
+    tempTasks := tasks[:0]
+    for _, task := range tasks {
+        if task.jobId != jobId {
+            tempTasks = append(tempTasks, task)
+        } else {
+            if task.workerId != -1 {
+                workers[task.workerId] = Worker{
+                    workers[task.workerId].workerAddr,
+                    0,
+                    -1,
+                }
+            }
+        }
+    }
+    tasks = tempTasks
+    jobs = append(jobs[:jobId], jobs[jobId + 1:]...)
 }
