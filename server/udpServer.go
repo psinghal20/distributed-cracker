@@ -83,8 +83,8 @@ func handleWorkerFoundRequest(data string, udpAddr *net.UDPAddr) {
 func setUpNewWorker(udpAddr *net.UDPAddr) {
     newWorker := Worker{
         udpAddr,
-        0,
-        -1,
+        FreeWorker,
+        NoTask,
     }
     workers = append(workers, newWorker)
 }
@@ -105,8 +105,9 @@ func sendWorkerTask(task Task, worker Worker) {
 func freeWorker(udpAddr *net.UDPAddr) {
     for inWorker, _ := range workers {
         if workers[inWorker].workerAddr.String() == udpAddr.String() {
-            workers[inWorker].status = 0
-            workers[inWorker].taskId = -1
+            workers[inWorker].status = FreeWorker
+            workers[inWorker].taskId = NoTask
         }
     }
+    distributeTask()
 }

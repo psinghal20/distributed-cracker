@@ -103,8 +103,8 @@ func permuteStrings(prefix string, k int, job Job) {
         if counter == 5000 || prefix == strings.Repeat("z", job.len) {
             newTask := Task{
                 job.jobId,
-                -1,
-                0,
+                NoWorker,
+                UnassignedTask,
                 start,
                 prefix,
             }
@@ -127,10 +127,10 @@ func permuteStrings(prefix string, k int, job Job) {
 func distributeTask() {
     for inTask, _ := range tasks {
         for inWorker, _ := range workers {
-            if tasks[inTask].status == 0 && workers[inWorker].status == 0 {
+            if tasks[inTask].status == UnassignedTask && workers[inWorker].status == FreeWorker {
                 tasks[inTask].workerId = inWorker
-                tasks[inTask].status = 1 //1 = assigned, 2 = completed
-                workers[inWorker].status = 1 //1 = busy
+                tasks[inTask].status = AssignedTask //1 = assigned, 2 = completed
+                workers[inWorker].status = BusyWorker //1 = busy
                 workers[inWorker].taskId = inTask
                 sendWorkerTask(tasks[inTask], workers[inWorker])
             }

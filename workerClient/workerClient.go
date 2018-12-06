@@ -3,7 +3,6 @@ package main
 import (
     "fmt"
     "net"
-    "bufio"
     "encoding/json"
     "os"
 )
@@ -32,16 +31,15 @@ func main() {
         fmt.Println(err)
         os.Exit(1)
     }
+    defer conn.Close()
     joinRequest()
-    readPacket()
-    executeQuery()
-    data, err := bufio.NewReader(conn).ReadString('\n')
-    if err != nil {
-        fmt.Println(err)
-        os.Exit(1)
+    for {
+        flag = false
+        resultFound = false
+        completed = false
+        readPacket()
+        executeQuery()
     }
-    fmt.Printf("Task : %s\n", data)
-    conn.Close()
 }
 
 func joinRequest() {
