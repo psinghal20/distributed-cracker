@@ -124,13 +124,14 @@ func permuteStrings(prefix string, k int, job Job) {
 }
 
 func distributeTask() {
+    fmt.Println("Distributing tasks")
     for taskId, task := range tasks {
         for workerId, worker := range workers {
             if task.status == UnassignedTask && worker.status == FreeWorker {
                 task.workerId = workerId
-                task.status = AssignedTask //1 = assigned
+                task.status = AssignedTask
                 tasks[taskId] = task
-                worker.status = BusyWorker //1 = busy
+                worker.status = BusyWorker
                 worker.taskId = taskId
                 workers[workerId] = worker
                 sendWorkerTask(tasks[taskId], workers[workerId])
