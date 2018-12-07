@@ -30,7 +30,6 @@ func permuteStrings(prefix string, k int) {
         if flag {
             checkString(prefix, receivedPacket.Hash)
             if prefix == receivedPacket.End {
-                fmt.Println("TASK COMPLETED!")
                 completed = true
             }
         }

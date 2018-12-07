@@ -3,7 +3,6 @@ package main
 import (
     "fmt"
     "net"
-    "bufio"
     "os"
 )
 
@@ -28,14 +27,14 @@ func main() {
         fmt.Println(err)
         os.Exit(1)
     }
-    data, err := bufio.NewReader(conn).ReadString('\n')
+    result := make([]byte, 1024)
+    size, err := conn.Read(result)
     if err != nil {
         fmt.Println(err)
         os.Exit(1)
     }
-    fmt.Print(data)
-    result := make([]byte, 1024)
-    size, err := conn.Read(result)
+    fmt.Print(string(result[:size]))
+    size, err = conn.Read(result)
     if err != nil {
         fmt.Println(err)
         os.Exit(1)

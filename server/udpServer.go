@@ -41,7 +41,7 @@ func udpServer(port string) {
     defer wg.Done()
     defer udpConn.Close()
     data := make([]byte, 1024)
-    
+
     for {
         size, udpAddr, err := udpConn.ReadFromUDP(data)
         if err != nil {
@@ -61,6 +61,7 @@ func handleUDPPacket(data []byte, udpAddr *net.UDPAddr) {
     default:
         handleWorkerFoundRequest(res, udpAddr)
     }
+    distributeTask()
 }
 
 func handleWorkerJoinRequest(udpAddr *net.UDPAddr) {
@@ -68,7 +69,6 @@ func handleWorkerJoinRequest(udpAddr *net.UDPAddr) {
     setUpNewWorker(udpAddr)
     udpConn.WriteToUDP([]byte("1"), udpAddr)
     fmt.Printf("Worker %v joined the network!\n", udpAddr)
-    distributeTask()
 }
 
 func handleWorkerNotFoundRequest(udpAddr *net.UDPAddr) {
@@ -80,6 +80,8 @@ func handleWorkerNotFoundRequest(udpAddr *net.UDPAddr) {
     if !ok {
         return
     }
+    task.status = CompletedTask
+    tasks[taskId] = task
     jobId := task.jobId
     if checkStatusOfJob(jobId) {
         sendResultToClient("Password Not Found!", jobId)
@@ -94,9 +96,11 @@ func handleWorkerFoundRequest(data string, udpAddr *net.UDPAddr) {
     if !ok {
         return
     }
+    task.status = CompletedTask
+    tasks[taskId] = task
     jobId := task.jobId
-    sendResultToClient(strings.Split(data, ":")[1], jobId)
     freeWorker(workerId)
+    sendResultToClient(strings.Split(data, ":")[1], jobId)
 }
 
 func setUpNewWorker(udpAddr *net.UDPAddr) {
@@ -125,7 +129,6 @@ func freeWorker(workerId string) {
     worker.status = FreeWorker
     worker.taskId = NoTask
     workers[workerId] = worker
-    distributeTask()
 }
 
 func removeTask(taskId string) {

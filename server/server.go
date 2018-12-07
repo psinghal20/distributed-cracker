@@ -70,8 +70,8 @@ func handleNewJobRequest(conn net.Conn) {
         return
     }
     jobParams := strings.Split(strings.TrimSuffix(data, "\n"), ":")
-    setUpNewJob(conn, jobParams)
     conn.Write([]byte("Working on you cracking request kindly wait!\n"))
+    setUpNewJob(conn, jobParams)
 }
 
 func setUpNewJob(conn net.Conn, jobParams []string) {
