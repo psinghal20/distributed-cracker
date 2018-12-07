@@ -31,7 +31,7 @@ var wg sync.WaitGroup
 
 func main() {
     arguments := os.Args
-    if len(arguments) == 2 {
+    if len(arguments) != 3 {
         fmt.Println("Please provide a port number")
         os.Exit(1)
     }
@@ -149,7 +149,10 @@ func removeJob(jobId string) {
 }
 
 func sendResultToClient(result string, jobId string) {
-    job := jobs[jobId]
+    job, ok := jobs[jobId]
+    if !ok {
+        return
+    }
     _, err := job.reqConn.Write([]byte(fmt.Sprintf("%s", result)))
     if err != nil {
         fmt.Println(err)

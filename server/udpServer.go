@@ -20,6 +20,13 @@ type Packet struct {
     End string
 }
 
+type Channels struct {
+    sendChan chan bool
+    distChan chan bool
+    jobIdChan chan string
+    resultChan chan string
+}
+
 var workers map[string]Worker = make(map[string]Worker)
 var udpConn *net.UDPConn
 
@@ -41,50 +48,68 @@ func udpServer(port string) {
     defer wg.Done()
     defer udpConn.Close()
     data := make([]byte, 1024)
+    channels := Channels{
+        make(chan bool),
+        make(chan bool),
+        make(chan string),
+        make(chan string),
+    }
     for {
         size, udpAddr, err := udpConn.ReadFromUDP(data)
         if err != nil {
             fmt.Println(err)
             return
         }
-        go handleUDPPacket(data[0:size], udpAddr)
+        go handleUDPPacket(data[0:size], udpAddr, channels)
+        select {
+            case <-channels.sendChan:
+                sendResultToClient(<-channels.resultChan, <-channels.jobIdChan)
+            case <- channels.distChan:
+                distributeTask()
+            default:
+                continue
+        }
     }
 }
 
-func handleUDPPacket(data []byte, udpAddr *net.UDPAddr) {
+func handleUDPPacket(data []byte, udpAddr *net.UDPAddr, channels Channels) {
     switch res := string(data[:]); res {
     case "JOIN":
-        handleWorkerJoinRequest(udpAddr)
+        handleWorkerJoinRequest(udpAddr, channels)
     case "NOT FOUND":
-        handleWorkerNotFoundRequest(udpAddr)
+        handleWorkerNotFoundRequest(udpAddr, channels)
     default:
-        handleWorkerFoundRequest(res, udpAddr)
+        handleWorkerFoundRequest(res, udpAddr, channels)
     }
 }
 
-func handleWorkerJoinRequest(udpAddr *net.UDPAddr) {
+func handleWorkerJoinRequest(udpAddr *net.UDPAddr, channels Channels) {
     fmt.Printf("Worker join request from: %v\n", udpAddr)
     setUpNewWorker(udpAddr)
     udpConn.WriteToUDP([]byte("1"), udpAddr)
     fmt.Printf("Worker %v joined the network!\n", udpAddr)
+    channels.distChan <- true
 }
 
-func handleWorkerNotFoundRequest(udpAddr *net.UDPAddr) {
+func handleWorkerNotFoundRequest(udpAddr *net.UDPAddr, channels Channels) {
     fmt.Println("Worker Couldn't find the password")
     workerId := udpAddr.String()
     taskId := workers[workerId].taskId
     task, ok := tasks[taskId]
+    freeWorker(workerId)
     if !ok {
         return
     }
     jobId := task.jobId
     if checkStatusOfJob(jobId) {
-        sendResultToClient("Password Not Found!", jobId)
+        // sendResultToClient("Password Not Found!", jobId)
+        channels.sendChan <- true
+        channels.resultChan <- "Password Not Found!"
+        channels.jobIdChan <- jobId
     }
-    freeWorker(workerId)
 }
 
-func handleWorkerFoundRequest(data string, udpAddr *net.UDPAddr) {
+func handleWorkerFoundRequest(data string, udpAddr *net.UDPAddr, channels Channels) {
     fmt.Printf("Worker node %v found the password : %s\n", udpAddr, data)
     workerId := udpAddr.String()
     taskId := workers[workerId].taskId
@@ -93,8 +118,11 @@ func handleWorkerFoundRequest(data string, udpAddr *net.UDPAddr) {
         return
     }
     jobId := task.jobId
-    sendResultToClient(strings.Split(data, ":")[1], jobId)
     freeWorker(workerId)
+        channels.sendChan <- true
+        channels.resultChan <- strings.Split(data, ":")[1]
+        channels.jobIdChan <- jobId
+    // sendResultToClient(strings.Split(data, ":")[1], jobId)
 }
 
 func setUpNewWorker(udpAddr *net.UDPAddr) {
