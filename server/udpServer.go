@@ -6,6 +6,8 @@ import (
     "os"
     "encoding/json"
     "strings"
+    "time"
+    "sync"
 )
 
 type Worker struct {
@@ -22,6 +24,7 @@ type Packet struct {
 
 var workers map[string]Worker = make(map[string]Worker)
 var udpConn *net.UDPConn
+var mutex = &sync.Mutex{}
 
 func (w Worker) isBusy() int {
     return w.status
@@ -41,34 +44,37 @@ func udpServer(port string) {
     defer wg.Done()
     defer udpConn.Close()
     data := make([]byte, 1024)
-
+    workerChan := make(chan bool)
+    go checkHealthOfWorkers(workerChan)
     for {
         size, udpAddr, err := udpConn.ReadFromUDP(data)
         if err != nil {
             fmt.Println(err)
             return
         }
-        go handleUDPPacket(data[0:size], udpAddr)
+        go handleUDPPacket(data[0:size], udpAddr, workerChan)
     }
 }
 
-func handleUDPPacket(data []byte, udpAddr *net.UDPAddr) {
+func handleUDPPacket(data []byte, udpAddr *net.UDPAddr, workerChan chan bool) {
     switch res := string(data[:]); res {
     case "JOIN":
         handleWorkerJoinRequest(udpAddr)
     case "NOT FOUND":
         handleWorkerNotFoundRequest(udpAddr)
+    case "ACK":
+        workerChan <- true
     default:
         handleWorkerFoundRequest(res, udpAddr)
     }
-    distributeTask()
 }
 
 func handleWorkerJoinRequest(udpAddr *net.UDPAddr) {
     fmt.Printf("Worker join request from: %v\n", udpAddr)
-    setUpNewWorker(udpAddr)
     udpConn.WriteToUDP([]byte("1"), udpAddr)
     fmt.Printf("Worker %v joined the network!\n", udpAddr)
+    setUpNewWorker(udpAddr)
+    distributeTask()
 }
 
 func handleWorkerNotFoundRequest(udpAddr *net.UDPAddr) {
@@ -86,6 +92,7 @@ func handleWorkerNotFoundRequest(udpAddr *net.UDPAddr) {
     if checkStatusOfJob(jobId) {
         sendResultToClient("Password Not Found!", jobId)
     }
+    distributeTask()
 }
 
 func handleWorkerFoundRequest(data string, udpAddr *net.UDPAddr) {
@@ -101,6 +108,7 @@ func handleWorkerFoundRequest(data string, udpAddr *net.UDPAddr) {
     jobId := task.jobId
     freeWorker(workerId)
     sendResultToClient(strings.Split(data, ":")[1], jobId)
+    distributeTask()
 }
 
 func setUpNewWorker(udpAddr *net.UDPAddr) {
@@ -142,4 +150,35 @@ func checkStatusOfJob(jobId string) bool {
         }
     }
     return true
+}
+
+func checkHealthOfWorkers(workerChan chan bool) {
+    for {
+        time.Sleep(10 * time.Second)
+        for workerId, worker := range workers {
+            if _, err := udpConn.WriteToUDP([]byte("CHECK"), worker.workerAddr); err != nil {
+                fmt.Println("Failed to communicate with worker!", err)
+                mutex.Lock()
+                unassignTask(worker.taskId)
+                delete(workers, workerId)
+                mutex.Unlock()
+                continue
+            }
+            select {
+            case <- workerChan:
+                continue
+            case <-time.After(5 * time.Second):
+                mutex.Lock()
+                unassignTask(worker.taskId)
+                delete(workers, workerId)
+                mutex.Unlock()
+            }
+        }
+    }
+}
+
+func unassignTask(taskId string) {
+    task := tasks[taskId]
+    task.status = UnassignedTask
+    task.workerId = NoWorker
 }
