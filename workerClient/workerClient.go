@@ -10,6 +10,7 @@ import (
 
 var conn net.Conn
 
+// Packet struct used to receive tasks from server
 type Packet struct {
     Hash string
     Start string
@@ -40,6 +41,7 @@ func main() {
     }
 }
 
+// Send network join request to the server
 func joinRequest() {
     response := make([]byte, 1024)
     conn.Write([]byte("JOIN"))
@@ -53,6 +55,8 @@ func joinRequest() {
     }
 }
 
+// Read data from the UDP connection
+// Check if the received data is Health check request or assigned task
 func readData() {
     buf := make([]byte, 1024)
     size, err := conn.Read(buf);
@@ -67,6 +71,7 @@ func readData() {
     }
 }
 
+// Respond to health check poll
 func respondPoll() {
     mutex.Lock()
     defer mutex.Unlock()
@@ -77,6 +82,7 @@ func respondPoll() {
     }
 }
 
+// Process the task packet received
 func processPacket(buf []byte) {
     err := json.Unmarshal(buf, &receivedPacket);
     if err != nil {
@@ -86,6 +92,8 @@ func processPacket(buf []byte) {
     flag = false
     resultFound = false
     completed = false
+    // Execute the received task request in another goroutine
+    // while listening for health check requests.
     go executeQuery()
 }
 

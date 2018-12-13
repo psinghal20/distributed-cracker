@@ -6,6 +6,7 @@ import (
     "io"
 )
 
+// Execute the query by generating each permutation and computing its hash.
 func executeQuery() {
     permuteStrings("", len(receivedPacket.Start))
     if completed {
@@ -43,6 +44,7 @@ func permuteStrings(prefix string, k int) {
     }
 }
 
+// check if the hash of test string is same to the given hash string.
 func checkString(test string, hash string) {
     h := sha1.New()
     io.WriteString(h, test)
